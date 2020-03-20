@@ -2,8 +2,6 @@
 #include <iostream>
 #include<vector>
 
-using namespace std;
-
 CRITICAL_SECTION cs;
 
 /*
@@ -19,15 +17,15 @@ volatile bool* isOver;//through this array, each thread detects if a completion 
 /*The function that threads perform*/
 void thread(int num)
 {
-	vector<int> marked;//indexes of marked items are stored here
+	std::vector<int> marked;//indexes of marked items are stored here
 	srand(num);
-	while(true)
+	while (true)
 	{
 		int index = rand() % sizeArr;
 		EnterCriticalSection(&cs);
-		cout << "Hello from " << num + 1 << ", Number = " << index << endl;
+		std::cout << "Hello from " << num + 1 << ", Number = " << index << std::endl;
 		LeaveCriticalSection(&cs);
-		
+
 		if (arr[index] == 0)// if not 0, then exactly stop
 		{
 			EnterCriticalSection(&cs);//here several threads could theoretically pass the test, so we need one more
@@ -43,7 +41,8 @@ void thread(int num)
 		else
 		{
 			EnterCriticalSection(&cs);
-			cout << "Thread #" << num + 1 << ", marked " << marked.size() << " elements, unable to mark at index " << index << endl;
+			std::cout << "Thread #" << num + 1 << ", marked " << marked.size()
+				<< " elements, unable to mark at index " << index << std::endl;
 			LeaveCriticalSection(&cs);
 
 			SetEvent(hOutEvent[num]);//the thread tells main that it has stopped. It sets an event by its number
@@ -113,9 +112,9 @@ void printArray(volatile int* arr, int size)
 {
 	for (int i = 0; i < size; i++)
 	{
-		cout << arr[i] << " ";
+		std::cout << arr[i] << " ";
 	}
-	cout << endl;
+	std::cout << std::endl;
 }
 
 
@@ -125,48 +124,48 @@ int main()
 	HANDLE*	hThread;
 	DWORD	IDThread;
 
-	cout << "Enter number of threads" << endl;
-	cin >> n;
-	cout << "Enter size of array" << endl;
-	cin >> sizeArr;
+	std::cout << "Enter number of threads" <<std:: endl;
+	std::cin >> n;
+	std::cout << "Enter size of array" << std::endl;
+	std::cin >> sizeArr;
 
 	InitializeCriticalSection(&cs);
 	hThread = new HANDLE[n];
 	hOutEvent = new HANDLE[n];
 	hMainEvent = new HANDLE[n];
 	isOver = new bool[n] {false};
-        arr = new int[sizeArr] {0};
+	arr = new int[sizeArr] {0};
 
-	initThrEv(hThread,IDThread,n);//creates events, as well as threads that will not be launched immediately
-	
+	initThrEv(hThread, IDThread, n);//creates events, as well as threads that will not be launched immediately
+
 	startTHR(hThread, n);//now launch
 
-	while (countLeft !=n)//until everyone is stopped
+	while (countLeft != n)//until everyone is stopped
 	{
 		int number;
 		WaitForMultipleObjects(n, hOutEvent, TRUE, INFINITE);//waits for all events from all threads
 
 		printArray(arr, sizeArr);
-		cout << "Enter number of THR to stop" << endl;
-		cin >> number;
-		isOver[number-1] = true;
+		std::cout << "Enter number of THR to stop" << std::endl;
+		std::cin >> number;
+		isOver[number - 1] = true;
 
-		SetEvent(hMainEvent[number-1]);//tells a specific thread to continue the work
-		WaitForSingleObject(hThread[number-1], INFINITE);//waiting for the completion of this thread
+		SetEvent(hMainEvent[number - 1]);//tells a specific thread to continue the work
+		WaitForSingleObject(hThread[number - 1], INFINITE);//waiting for the completion of this thread
 
 		printArray(arr, sizeArr);
 		resEvents(n);//resets events, but only for existing threads
 
 		countLeft++;//stopped threads counter
 	}
-	
+
 	DeleteCriticalSection(&cs);
 	delete[] hOutEvent;
 	delete[] hMainEvent;
 	delete[] isOver;
 	delete[] hThread;
 
-	cout << "Stop Machine!" << endl;
+	std::cout << "Stop Machine!" << std::endl;
 	system("pause");
 	return 0;
 }
