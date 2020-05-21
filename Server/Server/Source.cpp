@@ -1,4 +1,5 @@
 
+
 #include<Windows.h>
 #include<iostream>
 #include<string>
@@ -13,7 +14,7 @@ CRITICAL_SECTION csOutput, csReading;
 bool *isWriting, *isReading;
 string fileName;
 
-void createFile(string name, int numberOfRec, map<int,int> &index)
+void createFile(string name, int numberOfRec, map<int, int> &index)
 {
 	ofstream file(name, ios::binary);
 	for (int i = 0; i < numberOfRec; i++)
@@ -22,7 +23,7 @@ void createFile(string name, int numberOfRec, map<int,int> &index)
 		isWriting[i] = false;
 		cout << "Enter data for the " << i + 1 << " one " << endl;
 		employee emp;
-		
+
 		cout << "Enter id" << endl;
 		cin >> emp.num;
 		cout << "Enter name" << endl;
@@ -30,17 +31,17 @@ void createFile(string name, int numberOfRec, map<int,int> &index)
 		cout << "Enter hours" << endl;
 		cin >> emp.hours;
 		file.write((char*)&emp, sizeof(employee));
-		
+
 		index[emp.num] = i;
 	}
 	file.close();
 }
 
-void startTHR(HANDLE* hThread, int n)
+void startProc(HANDLE* hProc, int n)
 {
 	for (int i = 0; i < n; i++)
 	{
-		ResumeThread(hThread[i]);
+		ResumeThread(hProc[i]);
 	}
 }
 
@@ -73,7 +74,6 @@ employee readEmpl(string name, int pos)
 
 void formMessage(employee emp, message &msg)
 {
-	
 	msg.empl = emp;
 }
 
@@ -94,14 +94,14 @@ void writeEmpl(employee emp, string name, int pos)
 
 DWORD _stdcall work(LPVOID param)
 {
-	
+
 	parameter p = *(((parameter*)param));
 	ConnectNamedPipe(p.pipe, NULL);
-	
-	
-	
+
+
+
 	BOOL canRead;
-	map<int, int>* data= p.index;
+	map<int, int>* data = p.index;
 
 	while (true)
 	{
@@ -114,13 +114,13 @@ DWORD _stdcall work(LPVOID param)
 			cout << "Error in reading" << endl;
 			LeaveCriticalSection(&csOutput);
 			return 0;
-		} 
-		
+		}
+
 		int position = (*data)[msg.id];
 		BOOL canWrite;
 		switch (msg.FLAG)
 		{
-		case 1:	
+		case 1:
 			if (isWriting[position])
 			{
 				msg.id = -1;
@@ -149,8 +149,8 @@ DWORD _stdcall work(LPVOID param)
 					continue;
 				}
 				LeaveCriticalSection(&csReading);
-				
-				employee emp = readEmpl(fileName,position);
+
+				employee emp = readEmpl(fileName, position);
 				formMessage(emp, msg);
 				canWrite = WriteFile((p).pipe, &msg, sizeof(message), NULL, NULL);
 				if (!canWrite)
@@ -216,7 +216,7 @@ DWORD _stdcall work(LPVOID param)
 				formEmpl(msg, emp);
 				writeEmpl(emp, fileName, position);
 				isWriting[position] = false;
-				
+
 			}
 
 			break;
@@ -227,19 +227,19 @@ DWORD _stdcall work(LPVOID param)
 	return 0;
 }
 
-bool createProc(int id, string path)
+bool createProc(int &id, string path, PROCESS_INFORMATION &pi)
 {
-	PROCESS_INFORMATION pi;
 	STARTUPINFO si;
 	BOOL canCreate;
 	ZeroMemory(&si, sizeof(STARTUPINFO));
 	si.cb = sizeof(STARTUPINFO);
-	canCreate = CreateProcess(path.c_str(), (char*)(to_string(id).c_str()), NULL, NULL, FALSE, CREATE_NEW_CONSOLE, NULL,
+	canCreate = CreateProcess(path.c_str(), NULL, NULL, NULL, FALSE, CREATE_NEW_CONSOLE | PROCESS_SUSPEND_RESUME, NULL,
 		NULL, &si, &pi);
 	if (!canCreate)
 	{
 		return false;
 	}
+	id = pi.dwProcessId;
 	return true;
 }
 
@@ -249,7 +249,7 @@ bool createProc(int id, string path)
 int main()
 {
 	int numberOfRec, numberOfProc;
-	
+
 	string  pipeName = "\\\\.\\pipe\\AlphaBravo";
 	string pathProc = "C:\\Users\\HP\\source\\repos\\Client\\Debug\\Client.exe";
 	map<int, int> index;
@@ -264,19 +264,25 @@ int main()
 	createFile(fileName, numberOfRec, index);
 	printFile(fileName);
 
-	
+
 	HANDLE* threads = new HANDLE[numberOfProc];
 	HANDLE* pipes = new HANDLE[numberOfProc];
-	
+	HANDLE* processes = new HANDLE[numberOfProc];
+
 	InitializeCriticalSection(&csOutput);
 	InitializeCriticalSection(&csReading);
+	PROCESS_INFORMATION pi;
 	for (int i = 0; i < numberOfProc; i++)
 	{
 		parameter p;
 		p.index = &index;
 		p.number = i;
 		p.fileName = fileName;
-		pipes[i] = CreateNamedPipe((pipeName + to_string(i)).c_str(),
+		int id;
+		createProc(id, pathProc, pi);
+		processes[i] = pi.hProcess;
+
+		pipes[i] = CreateNamedPipe((pipeName + to_string(pi.dwProcessId)).c_str(),
 			PIPE_ACCESS_DUPLEX,
 			PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
 			1,
@@ -286,14 +292,12 @@ int main()
 			NULL);
 		p.pipe = pipes[i];
 		threads[i] = CreateThread(NULL, 0, work, (void*)&p, 0, NULL);
-		createProc(i, pathProc);	
+
 	}
 
-	//startTHR(threads, numberOfProc);
-	
+	startProc(processes, numberOfProc);
 	WaitForMultipleObjects(numberOfProc, threads, TRUE, INFINITE);
 	printFile(fileName);
-
-	//system("pause");
+	system("pause");
 	return 0;
 }

@@ -16,8 +16,6 @@ employee enterEmp()
 {
 	employee emp;
 	cout << "Enter data to insert" << endl;
-	cout << "Enter id" << endl;
-	cin >> emp.num;
 	cout << "Enter name" << endl;
 	cin >> emp.name;
 	cout << "Enter hours" << endl;
@@ -126,7 +124,9 @@ int work(HANDLE hPipe)
 			{
 				continue;
 			}
+			
 			emp = enterEmp();
+			emp.num = msg.empl.num;
 			msg = formMessage(emp);
 			canWrite = WriteFile(hPipe, &msg, sizeof(message), NULL, NULL);
 			if (!canWrite)
@@ -153,9 +153,9 @@ int work(HANDLE hPipe)
 
 int main(int argc, char** argv)
 {
-	string id = argv[0];
-	cout << pipeName + id << endl;
-	HANDLE hPipe = openPipe(pipeName + id);
+	int id = GetCurrentProcessId();
+	
+	HANDLE hPipe = openPipe(pipeName + to_string(id));
 	if (hPipe == INVALID_HANDLE_VALUE)
 	{
 		cout << "Error at opening pipe" << endl;
