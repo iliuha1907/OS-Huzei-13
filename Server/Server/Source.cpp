@@ -71,6 +71,17 @@ employee readEmpl(string name, int pos)
 	return emp;
 }
 
+void formMessage(employee emp, message &msg)
+{
+	
+	msg.empl = emp;
+}
+
+void formEmpl(message msg, employee &emp)
+{
+	emp = msg.empl;
+}
+
 void writeEmpl(employee emp, string name, int pos)
 {
 	ofstream fout(name, ios::binary || ios::app);
@@ -79,50 +90,47 @@ void writeEmpl(employee emp, string name, int pos)
 	fout.close();
 }
 
-DWORD  WINAPI work(void* param)
+
+
+DWORD _stdcall work(LPVOID param)
 {
+	
 	parameter p = *(((parameter*)param));
-	cout << "Started working thr " << (p).number << endl;
-	cout << "Handle: " << (p).pipe << endl;
-	EnterCriticalSection(&csOutput);
-	ConnectNamedPipe((p).pipe, NULL);
-	LeaveCriticalSection(&csOutput);
+	ConnectNamedPipe(p.pipe, NULL);
 	
-	cout << "Continuied working thr " << (p).number << endl;
-	cout << "Handle: " << (p).pipe << endl;
-	message msg;
+	
+	
 	BOOL canRead;
-	map<int, int>* data= (p).index;
-	
+	map<int, int>* data= p.index;
+
 	while (true)
 	{
-		
-		canRead = ReadFile((p).pipe, &msg, sizeof(message), NULL, NULL);
+		message msg;
+		canRead = ReadFile(p.pipe, &msg, sizeof(message), NULL, NULL);
+
 		if (!canRead)
 		{
 			EnterCriticalSection(&csOutput);
 			cout << "Error in reading" << endl;
 			LeaveCriticalSection(&csOutput);
-			exit(0);
-		}
-		cout << "Got message " << (p).number << endl;
+			return 0;
+		} 
+		
 		int position = (*data)[msg.id];
-
 		BOOL canWrite;
 		switch (msg.FLAG)
 		{
-		case 1:
-		
+		case 1:	
 			if (isWriting[position])
 			{
-				msg.data[0] = "Occupated!";
+				msg.id = -1;
 				canWrite = WriteFile((p).pipe, &msg, sizeof(message), NULL, NULL);
 				if (!canWrite)
 				{
 					EnterCriticalSection(&csOutput);
 					cout << "Error in writing" << endl;
 					LeaveCriticalSection(&csOutput);
-					exit(0);
+					return 0;
 				}
 			}
 			else
@@ -143,40 +151,33 @@ DWORD  WINAPI work(void* param)
 				LeaveCriticalSection(&csReading);
 				
 				employee emp = readEmpl(fileName,position);
-				string num = to_string(emp.num);
-				string hours = to_string(emp.hours);
-				msg.data[0] = num;
-				msg.data[1] = emp.name;
-				msg.data[2] = hours;
-				cout << "Writing back " << (p).number << endl;
+				formMessage(emp, msg);
 				canWrite = WriteFile((p).pipe, &msg, sizeof(message), NULL, NULL);
 				if (!canWrite)
 				{
 					EnterCriticalSection(&csOutput);
 					cout << "Error in writing" << endl;
 					LeaveCriticalSection(&csOutput);
-					exit(0);
+					return 0;
 				}
 				isReading[position] = false;
-				//LeaveCriticalSection(&csOutput);
 			}
 			break;
 		case 2:
 			if (isReading[position] || isWriting[position])
 			{
-				msg.data[0] = "Occupated!";
+				msg.id = -1;
 				canWrite = WriteFile((p).pipe, &msg, sizeof(message), NULL, NULL);
 				if (!canWrite)
 				{
 					EnterCriticalSection(&csOutput);
 					cout << "Error in writing" << endl;
 					LeaveCriticalSection(&csOutput);
-					exit(0);
+					return 0;
 				}
 			}
 			else
 			{
-
 				EnterCriticalSection(&csOutput);
 				if (isReading[position])
 				{
@@ -191,19 +192,16 @@ DWORD  WINAPI work(void* param)
 					continue;
 				}
 				LeaveCriticalSection(&csOutput);
+
 				employee emp = readEmpl(fileName, position);
-				string num = to_string(emp.num);
-				string hours = to_string(emp.hours);
-				msg.data[0] = num;
-				msg.data[1] = emp.name;
-				msg.data[2] = hours;
+				formMessage(emp, msg);
 				canWrite = WriteFile((p).pipe, &msg, sizeof(message), NULL, NULL);
 				if (!canWrite)
 				{
 					EnterCriticalSection(&csOutput);
 					cout << "Error in writing" << endl;
 					LeaveCriticalSection(&csOutput);
-					exit(0);
+					return 0;
 				}
 
 				canRead = ReadFile((p).pipe, &msg, sizeof(message), NULL, NULL);
@@ -212,11 +210,10 @@ DWORD  WINAPI work(void* param)
 					EnterCriticalSection(&csOutput);
 					cout << "Error in reading" << endl;
 					LeaveCriticalSection(&csOutput);
-					exit(0);
+					return 0;
 				}
-				emp.num = atoi(msg.data[0].c_str());
-				strcpy_s(emp.name, msg.data[1].c_str());
-				emp.hours = atof(msg.data[2].c_str());
+
+				formEmpl(msg, emp);
 				writeEmpl(emp, fileName, position);
 				isWriting[position] = false;
 				
@@ -224,9 +221,10 @@ DWORD  WINAPI work(void* param)
 
 			break;
 		default:
-			exit(0);
+			return 0;
 		}
 	}
+	return 0;
 }
 
 bool createProc(int id, string path)
@@ -287,15 +285,15 @@ int main()
 			NMPWAIT_USE_DEFAULT_WAIT,
 			NULL);
 		p.pipe = pipes[i];
-		threads[i] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)work, (void*)&p, NULL, NULL);
+		threads[i] = CreateThread(NULL, 0, work, (void*)&p, 0, NULL);
 		createProc(i, pathProc);	
 	}
 
 	//startTHR(threads, numberOfProc);
-
+	
 	WaitForMultipleObjects(numberOfProc, threads, TRUE, INFINITE);
 	printFile(fileName);
 
-	system("pause");
+	//system("pause");
 	return 0;
 }

@@ -37,22 +37,118 @@ HANDLE openPipe(string name)
 	return hPipe;
 }
 
-bool writeEmpl(int what, HANDLE hPipe)
+message getMessageWrite(int what)
 {
-	BOOL canWrite;
 	message msg;
 	int num;
 	cout << "Enter id of employee:" << endl;
 	cin >> num;
 	msg.id = num;
 	msg.FLAG = what;
-	canWrite = WriteFile(hPipe, &msg, sizeof(message), NULL, NULL);
-	if (!canWrite)
+	
+
+	return msg;
+}
+
+bool readMessage(message msg)
+{
+	if (msg.id == -1)
 	{
-		cout << "Error at writing to pipe";
+		cout << "Can not read right now. Try again" << endl;
 		return false;
 	}
+	cout << "Id = " << msg.empl.num << ", Name = " << msg.empl.name << ", Hours = " << msg.empl.hours << endl;
+	
 	return true;
+}
+
+int getChoice()
+{
+	int what;
+	cout << "Enter what you need to do ( 1 to read, 2 to write, 3 to stop)" << endl;
+	cin >> what;
+	return what;
+}
+
+message formMessage(employee emp)
+{
+	message msg;
+	msg.empl = emp;
+	return msg;
+}
+
+int work(HANDLE hPipe)
+{
+	while (true)
+	{
+		int what = getChoice();
+		BOOL canWrite, canRead;
+		message msg;
+		employee emp;
+		int num;
+		switch (what)
+		{
+		case 1:
+			msg = getMessageWrite(what);
+			canWrite = WriteFile(hPipe, &msg, sizeof(message), NULL, NULL);
+			if (!canWrite)
+			{
+				cout << "Error at writing to pipe";
+				return -1;
+			}
+
+			canRead = ReadFile(hPipe, &msg, sizeof(message), NULL, NULL);
+			if (!canRead)
+			{
+				cout << "Error at reading from pipe";
+				return -1;
+			}
+			if (!readMessage(msg))
+			{
+				continue;
+			}
+			break;
+		case 2:
+			msg = getMessageWrite(what);
+			canWrite = WriteFile(hPipe, &msg, sizeof(message), NULL, NULL);
+			if (!canWrite)
+			{
+				cout << "Error at writing to pipe";
+				return -1;
+			}
+			canRead = ReadFile(hPipe, &msg, sizeof(message), NULL, NULL);
+			if (!canRead)
+			{
+				cout << "Error at reading from pipe";
+				return -1;
+			}
+			if (!readMessage(msg))
+			{
+				continue;
+			}
+			emp = enterEmp();
+			msg = formMessage(emp);
+			canWrite = WriteFile(hPipe, &msg, sizeof(message), NULL, NULL);
+			if (!canWrite)
+			{
+				cout << "Error at writing to pipe";
+				return -1;
+			}
+			break;
+		default:
+			
+			msg.FLAG = 3;
+			canWrite = WriteFile(hPipe, &msg, sizeof(message), NULL, NULL);
+			if (!canWrite)
+			{
+				cout << "Error at writing to pipe";
+				return -1;
+			}
+			DisconnectNamedPipe(hPipe);
+			return 0;
+		}
+	}
+
 }
 
 int main(int argc, char** argv)
@@ -65,93 +161,7 @@ int main(int argc, char** argv)
 		cout << "Error at opening pipe" << endl;
 		return -1;
 	}
-	while (true)
-	{
-		int what;
-		cout << "Enter what you need to do ( 1 to read, 2 to write, 3 to stop)" << endl;
-		cin >> what;
-		BOOL canWrite, canRead;
-		message msg;
-		employee emp;
-		int num;
-		switch (what)
-		{
-		case 1:
-			
-			cout << "Enter id of employee:" << endl;
-			cin >> num;
-			msg.id = num;
-			msg.FLAG = what;
-			canWrite = WriteFile(hPipe, &msg, sizeof(message), NULL, NULL);
-			if (!canWrite)
-			{
-				cout << "Error at writing to pipe";
-				return -1;
-			}
-		/*	if (!writeEmpl(what, hPipe))
-			{
-				cout << "Error at writing to pipe";
-				return -1;
-			}*/
-			canRead = ReadFile(hPipe, &msg, sizeof(message), NULL, NULL);
-			if (!canRead)
-			{
-				cout << "Error at reading from pipe";
-				return -1;
-			}
-			if (msg.data[1].compare("") == 0)
-			{
-				cout << "Can not read right now. Try again" << endl;
-				continue;
-			}
-			cout << "ID = " << msg.data[0] << ", Name = " << msg.data[1] << ", Hours = " << msg.data[2] << endl;
-			break;
-		case 2:
-			cout << "Enter id of employee:" << endl;
-			cin >> num;
-			msg.id = num;
-			msg.FLAG = what;
-			canWrite = WriteFile(hPipe, &msg, sizeof(message), NULL, NULL);
-			if (!canWrite)
-			{
-				cout << "Error at writing to pipe";
-				return -1;
-			}
-			canRead = ReadFile(hPipe, &msg, sizeof(message), NULL, NULL);
-			if (!canRead)
-			{
-				cout << "Error at reading from pipe";
-				return -1;
-			}
-			if (msg.data[1].compare("") == 0)
-			{
-				cout << "Can not read right now. Try again" << endl;
-				continue;
-			}
-			cout << "ID = " << msg.data[0] << ", Name = " << msg.data[1] << ", Hours = " << msg.data[2] << endl;
-			emp = enterEmp();
-			msg.data[0] = to_string(emp.num);
-			msg.data[1] = emp.name;
-			msg.data[2] = to_string(emp.hours);
-			canWrite = WriteFile(hPipe, &msg, sizeof(message), NULL, NULL);
-			if (!canWrite)
-			{
-				cout << "Error at writing to pipe";
-				return -1;
-			}
-			break;
-		default:
-			msg.FLAG = 3;
-			canWrite = WriteFile(hPipe, &msg, sizeof(message), NULL, NULL);
-			if (!canWrite)
-			{
-				cout << "Error at writing to pipe";
-				return -1;
-			}
-			return 0;
-		}
-	}
-	
-	system("pause");
+	work(hPipe);
+
 	return 0;
 }
