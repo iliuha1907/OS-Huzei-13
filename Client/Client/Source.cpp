@@ -163,5 +163,6 @@ int main(int argc, char** argv)
 	}
 	work(hPipe);
 
+	CloseHandle(hPipe);
 	return 0;
 }
