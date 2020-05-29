@@ -298,6 +298,18 @@ int main()
 	startProc(processes, numberOfProc);
 	WaitForMultipleObjects(numberOfProc, threads, TRUE, INFINITE);
 	printFile(fileName);
+	
+	DeleteCriticalSection(&csReading);
+	DeleteCriticalSection(&csOutput);
+	
+	delete[] threads;
+	delete[] pipes;
+	delete[] processes;
+	delete[] isReading;
+	delete[] isWriting;
+	delete[] numberOfReading;
+	
 	system("pause");
 	return 0;
 }
+
